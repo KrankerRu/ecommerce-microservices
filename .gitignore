@@ -1,0 +1,29 @@
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+build.log
+.mvn/timing.properties
+
+# IntelliJ IDEA
+*.iml
+.idea/
+*.iws
+out/
+*.class
+
+# Java
+*.log
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local config (не коммитим секреты)
+*.env
+application-local.yml
