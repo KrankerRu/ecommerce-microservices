@@ -1,6 +1,7 @@
 services:
+  # === БАЗА ДАННЫХ ===
   db:
-    image: postgres:16-alpine 
+    image: postgres:16-alpine
     container_name: ecommerce-auth-db
     environment:
       POSTGRES_USER: ${DB_USERNAME}
@@ -10,36 +11,10 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-
-  prometheus:
-    image: prom/prometheus:v2.45.0
-    container_name: ecommerce-prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
     networks:
       - default
 
-  grafana:
-    image: grafana/grafana:10.0.0
-    container_name: ecommerce-grafana
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    volumes:
-      - grafana_data:/var/lib/grafana
-    depends_on:
-      - prometheus
-    networks:
-      - default
-
+  # === KAFKA ===
   kafka:
     image: apache/kafka:3.7.0
     container_name: ecommerce-kafka
@@ -62,6 +37,7 @@ services:
     networks:
       - default
 
+  # === KAFKA UI ===
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: ecommerce-kafka-ui
@@ -70,7 +46,94 @@ services:
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
-      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    depends_on:
+      - kafka
+    networks:
+      - default
+
+  # === PROMETHEUS ===
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: ecommerce-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - default
+
+  # === GRAFANA ===
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: ecommerce-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - default
+
+  # === AUTH SERVICE  ===
+  auth-service:
+    build: ./services/auth-service/auth-service
+    container_name: ecommerce-auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_APPLICATION_NAME=auth-service
+      - SERVER_PORT=8081
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/postgres
+      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      - db
+    networks:
+      - default
+
+  # === PRODUCT SERVICE ===
+  product-service:
+    build: ./services/product-service
+    container_name: ecommerce-product-service
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_APPLICATION_NAME=product-service
+      - SERVER_PORT=8082
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/postgres
+      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    depends_on:
+      - db
+      - kafka
+    networks:
+      - default
+
+  # === NOTIFICATION SERVICE ===
+  notification-service:
+    build: ./services/notification-service
+    container_name: ecommerce-notification-service
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_APPLICATION_NAME=notification-service
+      - SERVER_PORT=8083
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
     depends_on:
       - kafka
     networks:
@@ -78,9 +141,9 @@ services:
 
 volumes:
   pgdata:
+  kafka_data:
   prometheus_data:
   grafana_data:
-  kafka_data:
 
 networks:
   default:

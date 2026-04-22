@@ -4,6 +4,7 @@ import com.kranker.authservice.filter.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -23,17 +24,12 @@ public class SecurityConfig {
   private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
   @Bean
-  public SecurityFilterChain securityFilterChain(HttpSecurity http) {
+  @Order(2)
+  public SecurityFilterChain apiFilterChain(HttpSecurity http) throws Exception {
     http
         .csrf(AbstractHttpConfigurer::disable)
         .authorizeHttpRequests(auth -> auth
-            .requestMatchers(
-                "/test",
-                "/api/auth/**",
-                "/actuator/health",
-                "/actuator/info",
-                "/actuator/prometheus"
-            ).permitAll()
+            .requestMatchers("/api/auth/**").permitAll()
             .anyRequest().authenticated()
         )
         .formLogin(AbstractHttpConfigurer::disable)
