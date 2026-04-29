@@ -1,0 +1,30 @@
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+
+rules:
+  # Метрики топиков (сообщения, байты)
+  - pattern: "kafka.server<type=(.+), name=(.+), topic=(.+), partition=(.*)><>Value"
+    name: kafka_server_$1_$2
+    type: GAUGE
+    labels:
+      topic: "$3"
+      partition: "$4"
+
+  # Consumer lag (отставание консьюмеров)
+  - pattern: "kafka.consumer<type=consumer-fetch-manager-metrics, client-id=(.+), topic=(.+), partition=(.*)><>(.+): (.+)"
+    name: kafka_consumer_$5
+    type: GAUGE
+    labels:
+      client_id: "$1"
+      topic: "$2"
+      partition: "$3"
+
+  # Общие метрики брокера
+  - pattern: "kafka.server<type=(.+), name=(.+)><>Value"
+    name: kafka_server_$1_$2
+    type: GAUGE
+
+  # Метрики подключений
+  - pattern: "kafka.network<type=(.+), name=(.+)><>Value"
+    name: kafka_network_$1_$2
+    type: GAUGE

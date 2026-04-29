@@ -20,8 +20,9 @@ services:
     container_name: ecommerce-kafka
     hostname: kafka
     ports:
-      - "9092:9092"
-      - "29092:29092"
+      - "9092:9092"           # Для клиентов (наши сервисы)
+      - "29092:29092"         # Для внутренней связи
+      - "9999:9999"           # Только JMX Exporter (для Prometheus)
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -32,10 +33,22 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+      KAFKA_JMX_PORT: 9998
+      KAFKA_JMX_HOSTNAME: localhost
+
+      KAFKA_OPTS: "-javaagent:/jmx_exporter/jmx_prometheus_javaagent.jar=9999:/etc/kafka/jmx-exporter.yml"
     volumes:
       - kafka_data:/var/lib/kafka/data
+      - ./monitoring/kafka-jmx-exporter.yml:/etc/kafka/jmx-exporter.yml
+      - ./monitoring/jmx_prometheus_javaagent.jar:/jmx_exporter/jmx_prometheus_javaagent.jar:ro
     networks:
       - default
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # === KAFKA UI ===
   kafka-ui:
