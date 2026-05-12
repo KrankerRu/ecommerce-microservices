@@ -12,6 +12,8 @@ import com.kranker.orderservice.exception.ProductServiceUnavailableException;
 import com.kranker.orderservice.repository.OrderItemRepository;
 import com.kranker.orderservice.repository.OrderRepository;
 import feign.FeignException;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,8 @@ public class OrderService {
   private final OrderItemRepository orderItemRepository;
 
   @Transactional
+  @CircuitBreaker(name = "productService", fallbackMethod = "getProductFallback")
+  @Retry(name = "productService", fallbackMethod = "getProductFallback")
   public OrderResponse createOrder(OrderRequest request) {
     log.info("Creating order for user {} product {} qty {}",
         request.getUserId(), request.getProductId(), request.getQuantity());
@@ -84,6 +88,11 @@ public class OrderService {
     return mapToResponse(savedOrder);
   }
 
+  private OrderResponse getProductFallback(OrderRequest request, Throwable t) {
+    log.warn("Fallback triggered for product {}: {}", request.getProductId(), t.getMessage());
+    throw new ProductServiceUnavailableException("Product information temporarily unavailable");
+  }
+
   @Transactional(readOnly = true)
   public List<OrderResponse> getAllUserOrders(Long userId) {
     List<Order> orders = orderRepository.findByUserId(userId);
@@ -100,7 +109,6 @@ public class OrderService {
         .orElseThrow(() -> new OrderNotFoundException(orderId));
   }
 
-  // Маппер: Entity → Response DTO
   private OrderResponse mapToResponse(Order order) {
     List<OrderItemResponse> itemResponses = order.getOrderItems()
         .stream()
