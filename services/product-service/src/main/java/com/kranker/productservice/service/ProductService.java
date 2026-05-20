@@ -26,20 +26,16 @@ public class ProductService {
   private final KafkaProductEventPublisher kafkaProductEventPublisher;
 
   public ProductResponse createProduct(ProductRequest request){
-    if (productRepository.existsByName(request.getName())){
-      throw new ProductAlreadyExistsException(request.getName());
+    if (productRepository.existsByName(request.name())){
+      throw new ProductAlreadyExistsException(request.name());
     }
 
     Product product = mapper.toEntity(request);
     product.setCreatedAt(LocalDateTime.now());
     Product saved = productRepository.save(product);
 
-    ProductCreatedEvent event = ProductCreatedEvent
-        .builder()
-        .productId(saved.getId())
-        .productName(saved.getName())
-        .createdAt(LocalDateTime.now())
-        .build();
+    ProductCreatedEvent event = new ProductCreatedEvent(saved.getId(), saved.getName(),
+        LocalDateTime.now(), null);
 
     kafkaProductEventPublisher.publishProductCreated(event);
 

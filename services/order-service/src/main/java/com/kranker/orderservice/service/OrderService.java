@@ -1,7 +1,10 @@
 package com.kranker.orderservice.service;
 
 import com.kranker.orderservice.client.ProductClient;
-import com.kranker.orderservice.dto.*;
+import com.kranker.orderservice.dto.OrderItemResponse;
+import com.kranker.orderservice.dto.OrderRequest;
+import com.kranker.orderservice.dto.OrderResponse;
+import com.kranker.orderservice.dto.ProductDto;
 import com.kranker.orderservice.entity.Order;
 import com.kranker.orderservice.entity.OrderItem;
 import com.kranker.orderservice.entity.OrderStatus;
@@ -14,15 +17,14 @@ import com.kranker.orderservice.repository.OrderRepository;
 import feign.FeignException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -38,44 +40,44 @@ public class OrderService {
   @Retry(name = "productService", fallbackMethod = "getProductFallback")
   public OrderResponse createOrder(OrderRequest request) {
     log.info("Creating order for user {} product {} qty {}",
-        request.getUserId(), request.getProductId(), request.getQuantity());
+        request.userId(), request.productId(), request.quantity());
 
     ProductDto product;
     try {
-      product = productClient.getProductById(request.getProductId());
+      product = productClient.getProductById(request.productId());
     } catch (FeignException.NotFound e) {
-      log.warn("Product {} not found in Product Service", request.getProductId());
-      throw new ProductNotFoundException(request.getProductId());
-    } catch (FeignException e){
-      log.error("Error calling Product Service for product {}", request.getProductId(), e);
+      log.warn("Product {} not found in Product Service", request.productId());
+      throw new ProductNotFoundException(request.productId());
+    } catch (FeignException e) {
+      log.error("Error calling Product Service for product {}", request.productId(), e);
       throw new ProductServiceUnavailableException("Cannot reach Product Service");
     }
 
     if (product == null) {
-      throw new ProductNotFoundException(request.getProductId());
+      throw new ProductNotFoundException(request.productId());
     }
 
-    if (product.getStock() == null || product.getStock() < request.getQuantity()) {
+    if (product.stock() == null || product.stock() < request.quantity()) {
       throw new InsufficientStockException(
-          product.getName(), product.getStock(), request.getQuantity());
+          product.name(), product.stock(), request.quantity());
     }
 
-    if (product.getPrice() == null || product.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
-      throw new RuntimeException("Invalid price for product: " + product.getName());
+    if (product.price() == null || product.price().compareTo(BigDecimal.ZERO) <= 0) {
+      throw new RuntimeException("Invalid price for product: " + product.name());
     }
 
-    BigDecimal totalAmount = product.getPrice()
-        .multiply(BigDecimal.valueOf(request.getQuantity()));
+    BigDecimal totalAmount = product.price()
+        .multiply(BigDecimal.valueOf(request.quantity()));
 
     OrderItem orderItem = OrderItem.builder()
-        .productId(product.getId())
-        .productName(product.getName())
-        .quantity(request.getQuantity())
-        .priceAtOrder(product.getPrice())
+        .productId(product.id())
+        .productName(product.name())
+        .quantity(request.quantity())
+        .priceAtOrder(product.price())
         .build();
 
     Order order = Order.builder()
-        .userId(request.getUserId())
+        .userId(request.userId())
         .totalAmount(totalAmount)
         .status(OrderStatus.CREATED)
         .createdAt(LocalDateTime.now())
@@ -89,7 +91,7 @@ public class OrderService {
   }
 
   private OrderResponse getProductFallback(OrderRequest request, Throwable t) {
-    log.warn("Fallback triggered for product {}: {}", request.getProductId(), t.getMessage());
+    log.warn("Fallback triggered for product {}: {}", request.productId(), t.getMessage());
     throw new ProductServiceUnavailableException("Product information temporarily unavailable");
   }
 
@@ -112,24 +114,11 @@ public class OrderService {
   private OrderResponse mapToResponse(Order order) {
     List<OrderItemResponse> itemResponses = order.getOrderItems()
         .stream()
-        .map(item -> OrderItemResponse.builder()
-            .productId(item.getProductId())
-            .productName(item.getProductName())
-            .quantity(item.getQuantity())
-            .priceAtOrder(item.getPriceAtOrder())
-            .subtotal(item.getPriceAtOrder()
-                .multiply(BigDecimal.valueOf(item.getQuantity())))
-            .build())
-        .collect(Collectors.toList());
+        .map(item -> new OrderItemResponse(item.getProductId(), item.getProductName(), item.getQuantity(),
+            item.getPriceAtOrder(), item.getPriceAtOrder().multiply(BigDecimal.valueOf(item.getQuantity()))))
+        .toList();
 
-    return OrderResponse.builder()
-        .id(order.getId())
-        .userId(order.getUserId())
-        .totalAmount(order.getTotalAmount())
-        .status(order.getStatus())
-        .items(itemResponses)
-        .createdAt(order.getCreatedAt())
-        .updatedAt(order.getUpdatedAt())
-        .build();
+    return new OrderResponse(order.getId(), order.getUserId(), order.getTotalAmount(),
+        order.getStatus(), itemResponses, order.getCreatedAt(), order.getUpdatedAt());
   }
 }

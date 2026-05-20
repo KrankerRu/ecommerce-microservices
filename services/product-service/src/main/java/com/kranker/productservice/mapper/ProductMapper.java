@@ -11,16 +11,8 @@ public class ProductMapper {
     if (product == null) {
       return null;
     }
-    return ProductResponse.builder()
-        .id(product.getId())
-        .name(product.getName())
-        .description(product.getDescription())
-        .price(product.getPrice())
-        .stock(product.getStock())
-        .createdAt(product.getCreatedAt())
-        .updatedAt(product.getUpdatedAt())
-        .createdByUserId(product.getCreatedByUserId())
-        .build();
+    return new ProductResponse(product.getId(), product.getName(), product.getDescription(), product.getPrice(),
+        product.getStock(), product.getCreatedAt(), product.getUpdatedAt(), product.getCreatedByUserId());
   }
 
   public Product toEntity(ProductRequest request) {
@@ -28,10 +20,10 @@ public class ProductMapper {
       return null;
     }
     return Product.builder()
-        .name(request.getName())
-        .description(request.getDescription())
-        .price(request.getPrice())
-        .stock(request.getStock())
+        .name(request.name())
+        .description(request.description())
+        .price(request.price())
+        .stock(request.stock())
         .build();
   }
 }
